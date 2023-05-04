@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	namespace = "fastq"
-	clientID  = "fastq_exporter"
+	namespace = "fast5"
+	clientID  = "fast5_exporter"
 )
 
 const (
@@ -43,16 +43,16 @@ const (
 )
 
 var (
-	totalSizeMetric      *prometheus.Desc
-	totalAverageQualityMetric      *prometheus.Desc
-	numberOfReadsMetric  *prometheus.Desc
-	nMetric              *prometheus.Desc
-	aMetric              *prometheus.Desc
-	cMetric              *prometheus.Desc
-	gMetric              *prometheus.Desc
-	tMetric              *prometheus.Desc
-	maxReadMetric              *prometheus.Desc
-	averageQualityMetric *prometheus.Desc
+	totalSizeMetric           *prometheus.Desc
+	totalAverageQualityMetric *prometheus.Desc
+	numberOfReadsMetric       *prometheus.Desc
+	nMetric                   *prometheus.Desc
+	aMetric                   *prometheus.Desc
+	cMetric                   *prometheus.Desc
+	gMetric                   *prometheus.Desc
+	tMetric                   *prometheus.Desc
+	maxReadMetric             *prometheus.Desc
+	averageQualityMetric      *prometheus.Desc
 )
 
 var filenameSizeMap = make(map[string]int64)
@@ -106,7 +106,7 @@ type exporterOpts struct {
 	serverTlsCertFile        string
 	serverTlsKeyFile         string
 	tlsInsecureSkipTLSVerify bool
-	fastqVersion             string
+	fast5Version             string
 	useZooKeeperLag          bool
 	uriZookeeper             []string
 	labels                   string
@@ -162,11 +162,11 @@ func NewExporter(opts exporterOpts, topicFilter string, groupFilter string) (*Ex
 	var zookeeperClient *kazoo.Kazoo
 	config := sarama.NewConfig()
 	config.ClientID = clientID
-	fastqVersion, err := sarama.ParseKafkaVersion(opts.fastqVersion)
+	fast5Version, err := sarama.ParseKafkaVersion(opts.fast5Version)
 	if err != nil {
 		return nil, err
 	}
-	config.Version = fastqVersion
+	config.Version = fast5Version
 
 	if opts.useSASL {
 		// Convert to lowercase so that SHA512 and SHA256 is still valid
@@ -265,7 +265,7 @@ func NewExporter(opts exporterOpts, topicFilter string, groupFilter string) (*Ex
 	client, err := sarama.NewClient(opts.uri, config)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "Error Init Fastq Client")
+		return nil, errors.Wrap(err, "Error Init Fast5 Client")
 	}
 
 	klog.V(TRACE).Infoln("Done Init Clients")
@@ -300,7 +300,7 @@ func NewExporter(opts exporterOpts, topicFilter string, groupFilter string) (*Ex
 //	return 0
 //}
 
-// Describe describes all the metrics ever exported by the Fastq exporter. It
+// Describe describes all the metrics ever exported by the Fast5 exporter. It
 // implements prometheus.Collector.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- totalSizeMetric
@@ -380,8 +380,8 @@ type statisticsData struct {
 }
 
 func (e *Exporter) collect(ch chan<- prometheus.Metric) {
-	filepath.Walk("/tmp/fastq", func(path string, info os.FileInfo, err error) error {
-		if filepath.Ext(path) == ".fastq" {
+	filepath.Walk("/tmp/fast5", func(path string, info os.FileInfo, err error) error {
+		if filepath.Ext(path) == ".fast5" {
 			if _, ok := filenameSizeMap[path]; ok {
 				if filenameSizeMap[path] == info.Size() {
 					//continue
@@ -457,7 +457,7 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 
 func (e *Exporter) run(path string) {
 	var statistics []*statisticsData
-	result, err := exec.Command("python3", "python/parse_fastq_file.py", "--path", path).Output()
+	result, err := exec.Command("python3", "python/parse_fast5_file.py", "--path", path).Output()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -473,22 +473,22 @@ func (e *Exporter) run(path string) {
 		NumberOfG, _ := strconv.Atoi(statistic.NumberOfG)
 		NumberOfT, _ := strconv.Atoi(statistic.NumberOfT)
 		AverageQuality, _ := strconv.ParseFloat(statistic.AverageQuality, 32)
-		averageQualityTotal = ((float64(averageQualityTotal)*float64(numberOfNucleotidesTotal)) + (float64(AverageQuality)*(float64(NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)))) / (float64(numberOfNucleotidesTotal) + float64(NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT))
-		numberOfNucleotidesTotal = numberOfNucleotidesTotal + (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)
+		averageQualityTotal = ((float64(averageQualityTotal) * float64(numberOfNucleotidesTotal)) + (float64(AverageQuality) * (float64(NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)))) / (float64(numberOfNucleotidesTotal) + float64(NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT))
+		numberOfNucleotidesTotal = numberOfNucleotidesTotal + (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
 		if _, ok := numberOfReadsMap[statistic.Channel]; ok {
 			numberOfReadsMap[statistic.Channel] += NumberOfReads
 		} else {
 			numberOfReadsMap[statistic.Channel] = NumberOfReads
 		}
 		if _, ok := averageQualityMap[statistic.Channel]; ok {
-			averageQualityMap[statistic.Channel] = ((averageQualityMap[statistic.Channel]*float64(numberOfNucleotidesMap[statistic.Channel])) + (float64((NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT))*AverageQuality)) / (float64(numberOfNucleotidesMap[statistic.Channel]+NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT))
+			averageQualityMap[statistic.Channel] = ((averageQualityMap[statistic.Channel] * float64(numberOfNucleotidesMap[statistic.Channel])) + (float64((NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)) * AverageQuality)) / (float64(numberOfNucleotidesMap[statistic.Channel] + NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT))
 		} else {
 			averageQualityMap[statistic.Channel] = AverageQuality
 		}
 		if _, ok := numberOfNucleotidesMap[statistic.Channel]; ok {
-			numberOfNucleotidesMap[statistic.Channel] += (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)
+			numberOfNucleotidesMap[statistic.Channel] += (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
 		} else {
-			numberOfNucleotidesMap[statistic.Channel] = (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)
+			numberOfNucleotidesMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
 		}
 		if _, ok := numberOfNMap[statistic.Channel]; ok {
 			numberOfNMap[statistic.Channel] += NumberOfN
@@ -516,16 +516,18 @@ func (e *Exporter) run(path string) {
 			numberOfTMap[statistic.Channel] = NumberOfT
 		}
 		if _, ok := maxReadMap[statistic.Channel]; ok {
-			if (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT) > maxReadMap[statistic.Channel] {maxReadMap[statistic.Channel] = (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)}
+			if (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT) > maxReadMap[statistic.Channel] {
+				maxReadMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
+			}
 		} else {
-			maxReadMap[statistic.Channel] = (NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT)
+			maxReadMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
 		}
 	}
 }
 
 func init() {
 	metrics.UseNilMetrics = true
-	prometheus.MustRegister(version.NewCollector("fastq_exporter"))
+	prometheus.MustRegister(version.NewCollector("fast5_exporter"))
 }
 
 func toFlagString(name string, help string, value string) *string {
@@ -561,7 +563,7 @@ func toFlagIntVar(name string, help string, value int, valueString string, targe
 func main() {
 	var (
 		ontFast5DirPath = toFlagString("ont-fast5-dir-path", "Path to the dir where fast5 from ONT sequencer will be stored.", "/tmp")
-		listenAddress   = toFlagString("web.listen-address", "Address to listen on for web interface and telemetry.", ":9308")
+		listenAddress   = toFlagString("web.listen-address", "Address to listen on for web interface and telemetry.", ":9307")
 		metricsPath     = toFlagString("web.telemetry-path", "Path under which to expose metrics.", "/metrics")
 		topicFilter     = toFlagString("topic.filter", "Regex that determines which topics to collect.", ".*")
 		groupFilter     = toFlagString("group.filter", "Regex that determines which consumer groups to collect.", ".*")
@@ -570,9 +572,9 @@ func main() {
 		opts = exporterOpts{}
 	)
 
-	toFlagStringsVar("fastq.server", "Address (host:port) of fastq server.", "fastq:9092", &opts.uri)
+	toFlagStringsVar("fast5.server", "Address (host:port) of fast5 server.", "fast5:9092", &opts.uri)
 	toFlagBoolVar("sasl.enabled", "Connect using SASL/PLAIN, default is false.", false, "false", &opts.useSASL)
-	toFlagBoolVar("sasl.handshake", "Only set this to false if using a non-fastq SASL proxy, default is true.", true, "true", &opts.useSASLHandshake)
+	toFlagBoolVar("sasl.handshake", "Only set this to false if using a non-fast5 SASL proxy, default is true.", true, "true", &opts.useSASLHandshake)
 	toFlagStringVar("sasl.username", "SASL user name.", "", &opts.saslUsername)
 	toFlagStringVar("sasl.password", "SASL user password.", "", &opts.saslPassword)
 	toFlagStringVar("sasl.mechanism", "The SASL SCRAM SHA algorithm sha256 or sha512 or gssapi as mechanism", "", &opts.saslMechanism)
@@ -582,31 +584,31 @@ func main() {
 	toFlagStringVar("sasl.kerberos-auth-type", "Kerberos auth type. Either 'keytabAuth' or 'userAuth'", "", &opts.kerberosAuthType)
 	toFlagStringVar("sasl.keytab-path", "Kerberos keytab file path", "", &opts.keyTabPath)
 	toFlagBoolVar("sasl.disable-PA-FX-FAST", "Configure the Kerberos client to not use PA_FX_FAST, default is false.", false, "false", &opts.saslDisablePAFXFast)
-	toFlagBoolVar("tls.enabled", "Connect to fastq using TLS, default is false.", false, "false", &opts.useTLS)
-	toFlagStringVar("tls.server-name", "Used to verify the hostname on the returned certificates unless tls.insecure-skip-tls-verify is given. The fastq server's name should be given.", "", &opts.tlsServerName)
-	toFlagStringVar("tls.ca-file", "The optional certificate authority file for fastq TLS client authentication.", "", &opts.tlsCAFile)
-	toFlagStringVar("tls.cert-file", "The optional certificate file for fastq client authentication.", "", &opts.tlsCertFile)
-	toFlagStringVar("tls.key-file", "The optional key file for fastq client authentication.", "", &opts.tlsKeyFile)
+	toFlagBoolVar("tls.enabled", "Connect to fast5 using TLS, default is false.", false, "false", &opts.useTLS)
+	toFlagStringVar("tls.server-name", "Used to verify the hostname on the returned certificates unless tls.insecure-skip-tls-verify is given. The fast5 server's name should be given.", "", &opts.tlsServerName)
+	toFlagStringVar("tls.ca-file", "The optional certificate authority file for fast5 TLS client authentication.", "", &opts.tlsCAFile)
+	toFlagStringVar("tls.cert-file", "The optional certificate file for fast5 client authentication.", "", &opts.tlsCertFile)
+	toFlagStringVar("tls.key-file", "The optional key file for fast5 client authentication.", "", &opts.tlsKeyFile)
 	toFlagBoolVar("server.tls.enabled", "Enable TLS for web server, default is false.", false, "false", &opts.serverUseTLS)
 	toFlagBoolVar("server.tls.mutual-auth-enabled", "Enable TLS client mutual authentication, default is false.", false, "false", &opts.serverMutualAuthEnabled)
 	toFlagStringVar("server.tls.ca-file", "The certificate authority file for the web server.", "", &opts.serverTlsCAFile)
 	toFlagStringVar("server.tls.cert-file", "The certificate file for the web server.", "", &opts.serverTlsCertFile)
 	toFlagStringVar("server.tls.key-file", "The key file for the web server.", "", &opts.serverTlsKeyFile)
 	toFlagBoolVar("tls.insecure-skip-tls-verify", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure. Default is false", false, "false", &opts.tlsInsecureSkipTLSVerify)
-	toFlagStringVar("fastq.version", "Fastq version", sarama.V2_0_0_0.String(), &opts.fastqVersion)
+	toFlagStringVar("fast5.version", "Fast5 version", sarama.V2_0_0_0.String(), &opts.fast5Version)
 	toFlagBoolVar("use.consumelag.zookeeper", "if you need to use a group from zookeeper, default is false", false, "false", &opts.useZooKeeperLag)
 	toFlagStringsVar("zookeeper.server", "Address (hosts) of zookeeper server.", "localhost:2181", &opts.uriZookeeper)
-	toFlagStringVar("fastq.labels", "fastq cluster name", "", &opts.labels)
+	toFlagStringVar("fast5.labels", "fast5 cluster name", "", &opts.labels)
 	toFlagStringVar("refresh.metadata", "Metadata refresh interval", "30s", &opts.metadataRefreshInterval)
 	toFlagBoolVar("offset.show-all", "Whether show the offset/lag for all consumer group, otherwise, only show connected consumer groups, default is true", true, "true", &opts.offsetShowAll)
-	toFlagBoolVar("concurrent.enable", "If true, all scrapes will trigger fastq operations otherwise, they will share results. WARN: This should be disabled on large clusters. Default is false", false, "false", &opts.allowConcurrent)
+	toFlagBoolVar("concurrent.enable", "If true, all scrapes will trigger fast5 operations otherwise, they will share results. WARN: This should be disabled on large clusters. Default is false", false, "false", &opts.allowConcurrent)
 	toFlagIntVar("topic.workers", "Number of topic workers", 100, "100", &opts.topicWorkers)
-	toFlagBoolVar("fastq.allow-auto-topic-creation", "If true, the broker may auto-create topics that we requested which do not already exist, default is false.", false, "false", &opts.allowAutoTopicCreation)
+	toFlagBoolVar("fast5.allow-auto-topic-creation", "If true, the broker may auto-create topics that we requested which do not already exist, default is false.", false, "false", &opts.allowAutoTopicCreation)
 	toFlagIntVar("verbosity", "Verbosity log level", 0, "0", &opts.verbosityLogLevel)
 
 	plConfig := plog.Config{}
 	plogflag.AddFlags(kingpin.CommandLine, &plConfig)
-	kingpin.Version(version.Print("fastq_exporter"))
+	kingpin.Version(version.Print("fast5_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
@@ -644,7 +646,7 @@ func setup(
 	}
 	defer klog.Flush()
 
-	klog.V(INFO).Infoln("Starting fastq_exporter", version.Info())
+	klog.V(INFO).Infoln("Starting fast5_exporter", version.Info())
 	klog.V(DEBUG).Infoln("Build context", version.BuildContext())
 
 	totalSizeMetric = prometheus.NewDesc(
@@ -712,9 +714,9 @@ func setup(
 	http.Handle(metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
-		        <head><title>Fastq Exporter</title></head>
+		        <head><title>Fast5 Exporter</title></head>
 		        <body>
-		        <h1>Fastq Exporter</h1>
+		        <h1>Fast5 Exporter</h1>
 		        <p><a href='` + metricsPath + `'>Metrics</a></p>
 		        </body>
 		        </html>`))
