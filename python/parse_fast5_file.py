@@ -3,6 +3,8 @@ import json
 import os
 from collections import Counter
 import numpy as np
+from ont_fast5_api.fast5_file import Fast5File
+from ont_fast5_api.fast5_interface import get_fast5_file
 
 def get_file_size(file_path):
     """
@@ -138,7 +140,7 @@ def split_all(path):
             all_parts.insert(0, parts[1])
     return all_parts
 
-def check_fastq_path(path):
+def check_fast5_path(path):
     """
     Check if the files we are looking at are directly inside pass or fail folders, or one or two removed.
     :param path:
@@ -176,156 +178,96 @@ def get_runid(fastq):
             runid = _.split("=")[1]
     return runid
 
-def parse_fastq_file(
-    fastq_path #, run_dict, args, header, minotour_api, sequencing_stats
+def parse_fast5_file(
+    fast5_path
 ):
-    """
-    
-    Parameters
-    ----------
-    fastq_path: str
-        Path to the fastq file to parse
-    run_dict: dict
-        Dictionary containing the run
-    args: argparse.NameSpace
-        The namespace of the parsed command line args
-    header: dict
-        The authentication header to make requests to the server
-    minotour_api: minFQ.minotourapi.MinotourAPI
-        The minotour API class instance for convenience request to the server
-    sequencing_stats: minFQ.utils.SequencingStatistics
-        The class to track the sequencing upload metrics and files
+#    numberOfReads = 0
+#    numberOfN = 0
+#    numberOfA = 0
+#    numberOfC = 0
+#    numberOfG = 0
+#    numberOfT = 0
+#    run_dict = dict()
+#    run_id = get_runid(fast5_path)
+#    payload = {
+#        "file_name": str(check_fast5_path(fast5_path)),
+#        "run_id": run_id,
+#        "md5": "0",
+#        "run": None
+#    }
+#    counter = 0
+#    quality = ''
+#    handle = gzip.open if fast5_path.endswith(".gz") else open
+#    with handle(fast5_path, "rt") as fh:
+#        for desc, name, seq, qual in readfq(fh):
+#            description_dict = parse_fastq_description(desc)
+#            counter += 1
+#            numberOfReads += 1
+#            numberOfN = seq.count('N') + seq.count('n')
+#            numberOfA = seq.count('A') + seq.count('a')
+#            numberOfC = seq.count('C') + seq.count('c')
+#            numberOfG = seq.count('G') + seq.count('g')
+#            numberOfT = seq.count('T') + seq.count('t')
+#            quality += qual
+#            try:
+#                if description_dict["runid"] not in run_dict:
+#                    create_run_collection(
+#                        run_id,
+#                        run_dict,
+#                        args,
+#                        header,
+#                        description_dict,
+#                        sequencing_stats,
+#                    )
+#                    fastq_file = minotour_api.post(
+#                        EndPoint.FASTQ_FILE, json=payload, base_id=run_id
+#                    )
+#                    run_dict[run_id].get_readnames_by_run(fastq_file["id"])
+#                parse_fastq_record(
+#                    name,
+#                    seq,
+#                    qual,
+#                    fast5_path,
+#                    run_dict,
+#                    args,
+#                    fastq_file,
+#                    counter=counter,
+#                    sequencing_statistic=sequencing_stats,
+#                    description_dict=description_dict,
+#                )
 
-    Returns
-    -------
-    int 
-        The updated number of lines we have already seen from the unblocked read ids file
-    """
-    numberOfReads = 0
-    numberOfN = 0
-    numberOfA = 0
-    numberOfC = 0
-    numberOfG = 0
-    numberOfT = 0
-    run_dict = dict()
-    # The updated number of lines we have already seen from the unblocked read ids file
-    #log.debug("Parsing fastq file {}".format(fastq_path))
-    # Get runId from the path
-    run_id = get_runid(fastq_path)
-    #print(run_id)
-    payload = {
-        "file_name": str(check_fastq_path(fastq_path)),
-        "run_id": run_id,
-        "md5": "0",
-        "run": None
-    }
-    #if run_id in run_dict:
-    #    fastq_file = minotour_api.post(
-    #        EndPoint.FASTQ_FILE, json=payload, base_id=run_id
-    #    )
-    #if not sequencing_stats.fastq_info[run_id]["run_id"]:
-    #    sequencing_stats.fastq_info[run_id]["run_id"] = run_id
-    counter = 0
-    quality = ''
-    handle = gzip.open if fastq_path.endswith(".gz") else open
-    with handle(fastq_path, "rt") as fh:
-        for desc, name, seq, qual in readfq(fh):
-            description_dict = parse_fastq_description(desc)
-            counter += 1
-            numberOfReads += 1
-            numberOfN = seq.count('N') + seq.count('n')
-            numberOfA = seq.count('A') + seq.count('a')
-            numberOfC = seq.count('C') + seq.count('c')
-            numberOfG = seq.count('G') + seq.count('g')
-            numberOfT = seq.count('T') + seq.count('t')
-            quality += qual
-            #sequencing_stats.reads_seen += 1
-            #sequencing_stats.fastq_info[run_id]["reads_seen"] += 1
-            #sequencing_stats.fastq_message = "processing read {}".format(counter)
-            try:
-                ### We haven't seen this run before - so we need to check stuff.
-                # create runCOllection in the runDict
-                if description_dict["runid"] not in run_dict:
-                    create_run_collection(
-                        run_id,
-                        run_dict,
-                        args,
-                        header,
-                        description_dict,
-                        sequencing_stats,
-                    )
-                    fastq_file = minotour_api.post(
-                        EndPoint.FASTQ_FILE, json=payload, base_id=run_id
-                    )
-                    run_dict[run_id].get_readnames_by_run(fastq_file["id"])
-                parse_fastq_record(
-                    name,
-                    seq,
-                    qual,
-                    fastq_path,
-                    run_dict,
-                    args,
-                    fastq_file,
-                    counter=counter,
-                    sequencing_statistic=sequencing_stats,
-                    description_dict=description_dict,
-                )
+#            except Exception as e:
+#                continue
 
-            except Exception as e:
-                #sequencing_stats.reads_corrupt += 1
-                continue
-    # This chunk of code will mean we commit reads every time we get a new file?
-    #for runs in run_dict:
-    #    run_dict[runs].read_names = []
-    #    run_dict[runs].commit_reads()
-    #try:
-        # Update the fastq file entry on the server that says we provides file size to database record
-    #    payload = {
-    #        "file_name": str(check_fastq_path(fastq_path)),
-    #        "run_id": run_id,
-    #        "md5": get_file_size(fastq_path),
-    #        "run": run_dict[run_id].run,
-    #    }
-    #    fastq_file = minotour_api.put(EndPoint.FASTQ_FILE, json=payload, base_id=run_id)
-    #except Exception as err:
-    #    log.error("Problem with uploading file {}".format(err))
-    #sequencing_stats.time_per_file = time.time()
-    #sequencing_stats.fastq_info[run_id]["files_processed"] += 1
-    averageQuality = round(average_quality(quality), 2,)
-    isPass = check_is_pass(fastq_path, averageQuality)
-    fileSize = get_file_size(fastq_path)
-    read = description_dict.get("read", None)
-    runId = description_dict.get("runid", None)
-    channel = description_dict.get("ch", None)
-    startTime = description_dict.get("start_time", None)
-    return numberOfReads, numberOfN, numberOfA, numberOfC, numberOfG, numberOfT, averageQuality, isPass, fileSize, read, runId, channel, startTime
+
+
+    #summary_data = Fast5File.read_summary_data(fast5_path, 'segmentation')
+    fileSize = get_file_size(fast5_path)
+    with get_fast5_file(fast5_path) as f5:
+        raw_data = f5.get_read(f5.get_read_ids()[0]).get_raw_data()
+        channel_number = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['channel_number']
+        digitisation = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['digitisation']
+        offset = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['offset']
+        range = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['range']
+        sampling_rate = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['sampling_rate']
+    return fileSize, len(raw_data), channel_number
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Parse fastq file"
+        description="Parse fast5 file"
     )
     parser.add_argument(
-        "--path", default="", help="Path to fastq file"
+        "--path", default="", help="Path to fast5 file"
     )
     args = parser.parse_args()
 
-    numberOfReads, numberOfN, numberOfA, numberOfC, numberOfG, numberOfT, averageQuality, isPass, fileSize, read, runId, channel, startTime = parse_fastq_file(args.path)
+    fileSize, rawDataLength, channelNumber= parse_fast5_file(args.path)
 
     result = list()
     vars = dict()
-    vars['numberOfReads'] = str(numberOfReads)
-    vars['numberOfN'] = str(numberOfN)
-    vars['numberOfA'] = str(numberOfA)
-    vars['numberOfC'] = str(numberOfC)
-    vars['numberOfG'] = str(numberOfG)
-    vars['numberOfT'] = str(numberOfT)
-    vars['averageQuality'] = str(averageQuality)
-    vars['isPass'] = str(isPass)
     vars['fileSize'] = str(fileSize)
-    vars['read'] = str(read)
-    vars['runId'] = str(runId)
-    vars['channel'] = str(channel)
-    vars['startTime'] = str(startTime)
+    vars['rawDataLength'] = str(rawDataLength)
+    vars['channelNumber'] = str(channelNumber)
     result.append(vars)
 
     print('[' + ','.join(json.dumps(d) for d in result) + ']')
