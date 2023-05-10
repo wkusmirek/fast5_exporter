@@ -7,6 +7,8 @@ ARG BIN_DIR=.
 RUN apt-get update
 RUN apt-get install -y python3 pip
 
+RUN pip3 install ont-fast5-api
+
 COPY ${BIN_DIR}/fast5_exporter /fast5_exporter
 COPY ${BIN_DIR}/python /python
 
