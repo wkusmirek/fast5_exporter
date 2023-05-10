@@ -250,7 +250,7 @@ def parse_fast5_file(
         offset = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['offset']
         range = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['range']
         sampling_rate = f5.get_read(f5.get_read_ids()[0]).get_channel_info()['sampling_rate']
-    return fileSize, len(raw_data), channel_number
+    return fileSize, len(raw_data), channel_number, digitisation, offset, range, sampling_rate
 
 def main():
     parser = argparse.ArgumentParser(
@@ -261,13 +261,17 @@ def main():
     )
     args = parser.parse_args()
 
-    fileSize, rawDataLength, channelNumber= parse_fast5_file(args.path)
+    fileSize, rawDataLength, channelNumber, digitisation, offset, range, samplingRate = parse_fast5_file(args.path)
 
     result = list()
     vars = dict()
     vars['fileSize'] = str(fileSize)
     vars['rawDataLength'] = str(rawDataLength)
     vars['channelNumber'] = str(channelNumber)
+    vars['digitisation'] = str(digitisation)
+    vars['offset'] = str(offset)
+    vars['range'] = str(range)
+    vars['samplingRate'] = str(samplingRate)
     result.append(vars)
 
     print('[' + ','.join(json.dumps(d) for d in result) + ']')

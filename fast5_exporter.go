@@ -43,33 +43,18 @@ const (
 )
 
 var (
-	totalSizeMetric           *prometheus.Desc
-	totalAverageQualityMetric *prometheus.Desc
-	numberOfReadsMetric       *prometheus.Desc
-	nMetric                   *prometheus.Desc
-	aMetric                   *prometheus.Desc
-	cMetric                   *prometheus.Desc
-	gMetric                   *prometheus.Desc
-	tMetric                   *prometheus.Desc
-	maxReadMetric             *prometheus.Desc
-	averageQualityMetric      *prometheus.Desc
-	rawDataLengthMetric       *prometheus.Desc
+	totalSizeMetric     *prometheus.Desc
+	numberOfReadsMetric *prometheus.Desc
+	maxReadMetric       *prometheus.Desc
+	rawDataLengthMetric *prometheus.Desc
 )
 
 var filenameSizeMap = make(map[string]int64)
 
 var numberOfReadsMap = make(map[string]int)
-var numberOfNucleotidesMap = make(map[string]int)
-var numberOfNucleotidesTotal = 0
-var averageQualityTotal = float64(0.0)
-var numberOfNMap = make(map[string]int)
-var numberOfAMap = make(map[string]int)
-var numberOfCMap = make(map[string]int)
-var numberOfGMap = make(map[string]int)
-var numberOfTMap = make(map[string]int)
-var maxReadMap = make(map[string]int)
-var averageQualityMap = make(map[string]float64)
 var rawDataLengthMap = make(map[string]int)
+var rawDataLengthTotal = 0
+var maxRawDataLengthMap = make(map[string]int)
 
 type Exporter struct {
 	client                  sarama.Client
@@ -307,13 +292,7 @@ func NewExporter(opts exporterOpts, topicFilter string, groupFilter string) (*Ex
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- totalSizeMetric
 	ch <- numberOfReadsMetric
-	ch <- nMetric
-	ch <- aMetric
-	ch <- cMetric
-	ch <- gMetric
-	ch <- tMetric
 	ch <- maxReadMetric
-	ch <- averageQualityMetric
 	ch <- rawDataLengthMetric
 }
 
@@ -370,6 +349,10 @@ type statisticsData struct {
 	FileSize      string `json:'fileSize'`
 	RawDataLength string `json:'rawDataLength'`
 	ChannelNumber string `json:'channelNumber'`
+	Digitisation  string `json:'digitisation'`
+	Offset        string `json:'offset'`
+	Range         string `json:'range'`
+	SamplingRate  string `json:'samplingRate'`
 }
 
 func (e *Exporter) collect(ch chan<- prometheus.Metric) {
@@ -396,14 +379,13 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 	})
 
 	var totalSize = 0
+
 	for _, element := range filenameSizeMap {
 		totalSize += int(element)
 	}
+
 	ch <- prometheus.MustNewConstMetric(
 		totalSizeMetric, prometheus.GaugeValue, float64(totalSize), "address", "name",
-	)
-	/*ch <- prometheus.MustNewConstMetric(
-		totalAverageQualityMetric, prometheus.GaugeValue, float64(averageQualityTotal), "address", "name",
 	)
 
 	for key, element := range numberOfReadsMap {
@@ -411,41 +393,13 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 			numberOfReadsMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
 		)
 	}
-	for key, element := range numberOfNMap {
-		ch <- prometheus.MustNewConstMetric(
-			nMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}
-	for key, element := range numberOfAMap {
-		ch <- prometheus.MustNewConstMetric(
-			aMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}
-	for key, element := range numberOfCMap {
-		ch <- prometheus.MustNewConstMetric(
-			cMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}
-	for key, element := range numberOfGMap {
-		ch <- prometheus.MustNewConstMetric(
-			gMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}
-	for key, element := range numberOfTMap {
-		ch <- prometheus.MustNewConstMetric(
-			tMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}
-	for key, element := range maxReadMap {
+
+	for key, element := range maxRawDataLengthMap {
 		ch <- prometheus.MustNewConstMetric(
 			maxReadMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
 		)
 	}
-	for key, element := range averageQualityMap {
-		ch <- prometheus.MustNewConstMetric(
-			averageQualityMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
-		)
-	}*/
+
 	for key, element := range rawDataLengthMap {
 		ch <- prometheus.MustNewConstMetric(
 			rawDataLengthMetric, prometheus.GaugeValue, float64(element), "address", "name", key,
@@ -465,67 +419,27 @@ func (e *Exporter) run(path string) {
 	}
 	for _, statistic := range statistics {
 		RawDataLength, _ := strconv.Atoi(statistic.RawDataLength)
-		/*NumberOfReads, _ := strconv.Atoi(statistic.NumberOfReads)
-		NumberOfN, _ := strconv.Atoi(statistic.NumberOfN)
-		NumberOfA, _ := strconv.Atoi(statistic.NumberOfA)
-		NumberOfC, _ := strconv.Atoi(statistic.NumberOfC)
-		NumberOfG, _ := strconv.Atoi(statistic.NumberOfG)
-		NumberOfT, _ := strconv.Atoi(statistic.NumberOfT)
-		AverageQuality, _ := strconv.ParseFloat(statistic.AverageQuality, 32)
-		averageQualityTotal = ((float64(averageQualityTotal) * float64(numberOfNucleotidesTotal)) + (float64(AverageQuality) * (float64(NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)))) / (float64(numberOfNucleotidesTotal) + float64(NumberOfN+NumberOfA+NumberOfC+NumberOfG+NumberOfT))
-		numberOfNucleotidesTotal = numberOfNucleotidesTotal + (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
-		if _, ok := numberOfReadsMap[statistic.Channel]; ok {
-			numberOfReadsMap[statistic.Channel] += NumberOfReads
+		NumberOfReads, _ := 1, 1
+		rawDataLengthTotal += RawDataLength
+		if _, ok := numberOfReadsMap[statistic.ChannelNumber]; ok {
+			numberOfReadsMap[statistic.ChannelNumber] += NumberOfReads
 		} else {
-			numberOfReadsMap[statistic.Channel] = NumberOfReads
+			numberOfReadsMap[statistic.ChannelNumber] = NumberOfReads
 		}
-		if _, ok := averageQualityMap[statistic.Channel]; ok {
-			averageQualityMap[statistic.Channel] = ((averageQualityMap[statistic.Channel] * float64(numberOfNucleotidesMap[statistic.Channel])) + (float64((NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)) * AverageQuality)) / (float64(numberOfNucleotidesMap[statistic.Channel] + NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT))
-		} else {
-			averageQualityMap[statistic.Channel] = AverageQuality
-		}
-		if _, ok := numberOfNucleotidesMap[statistic.Channel]; ok {
-			numberOfNucleotidesMap[statistic.Channel] += (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
-		} else {
-			numberOfNucleotidesMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
-		}
-		if _, ok := numberOfNMap[statistic.Channel]; ok {
-			numberOfNMap[statistic.Channel] += NumberOfN
-		} else {
-			numberOfNMap[statistic.Channel] = NumberOfN
-		}
-		if _, ok := numberOfAMap[statistic.Channel]; ok {
-			numberOfAMap[statistic.Channel] += NumberOfA
-		} else {
-			numberOfAMap[statistic.Channel] = NumberOfA
-		}
-		if _, ok := numberOfCMap[statistic.Channel]; ok {
-			numberOfCMap[statistic.Channel] += NumberOfC
-		} else {
-			numberOfCMap[statistic.Channel] = NumberOfC
-		}
-		if _, ok := numberOfGMap[statistic.Channel]; ok {
-			numberOfGMap[statistic.Channel] += NumberOfG
-		} else {
-			numberOfGMap[statistic.Channel] = NumberOfG
-		}
-		if _, ok := numberOfTMap[statistic.Channel]; ok {
-			numberOfTMap[statistic.Channel] += NumberOfT
-		} else {
-			numberOfTMap[statistic.Channel] = NumberOfT
-		}
-		if _, ok := maxReadMap[statistic.Channel]; ok {
-			if (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT) > maxReadMap[statistic.Channel] {
-				maxReadMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
-			}
-		} else {
-			maxReadMap[statistic.Channel] = (NumberOfN + NumberOfA + NumberOfC + NumberOfG + NumberOfT)
-		}*/
 		if _, ok := rawDataLengthMap[statistic.ChannelNumber]; ok {
 			rawDataLengthMap[statistic.ChannelNumber] += RawDataLength
 		} else {
 			rawDataLengthMap[statistic.ChannelNumber] = RawDataLength
 		}
+
+		if _, ok := maxRawDataLengthMap[statistic.ChannelNumber]; ok {
+			if (RawDataLength) > maxRawDataLengthMap[statistic.ChannelNumber] {
+				maxRawDataLengthMap[statistic.ChannelNumber] = RawDataLength
+			}
+		} else {
+			maxRawDataLengthMap[statistic.ChannelNumber] = RawDataLength
+		}
+
 	}
 }
 
@@ -658,48 +572,13 @@ func setup(
 		"Stats",
 		[]string{"address", "name"}, labels,
 	)
-	totalAverageQualityMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "total", "average_quality"),
-		"Stats",
-		[]string{"address", "name"}, labels,
-	)
 	numberOfReadsMetric = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "amount", "reads"),
 		"Stats",
 		[]string{"address", "name", "channel"}, labels,
 	)
-	nMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "amount", "N"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
-	aMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "amount", "A"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
-	cMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "amount", "C"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
-	gMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "amount", "G"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
-	tMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "amount", "T"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
 	maxReadMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "max", "read"),
-		"Stats",
-		[]string{"address", "name", "channel"}, labels,
-	)
-	averageQualityMetric = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "average", "quality"),
+		prometheus.BuildFQName(namespace, "max_raw_data", "length"),
 		"Stats",
 		[]string{"address", "name", "channel"}, labels,
 	)
